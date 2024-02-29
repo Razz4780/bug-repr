@@ -1,10 +1,9 @@
 {
-    "target": null,
+    "target": "pod/py-serv-deployment-5fffb9767c-swrdv",
     "feature": {
-        "fs": "local",
         "network": {
             "outgoing": true,
-            "incoming": false,
+            "incoming": "steal",
             "dns": true
         }
     }

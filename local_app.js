@@ -1,43 +1,67 @@
-const express = require("express");
 const net = require("net")
 
-const app = express();
-const PORT = 8080;
+const server = net.createServer();
+server.on('connection', handleConnection);
 
-app.get(
-  "/",
-  (req, res) => {
-    console.log("Got request");
+server.listen(80, () => console.log('server listening on %j', server.address()));
 
-    let receivedFrom1 = 0;
-    let receivedFrom2 = 0;
-    let client2Started = false;
+function handleConnection(conn) {
+  const remoteAddress = conn.remoteAddress + ':' + conn.remotePort;
 
-    setInterval(() => console.log(`Received from spammer-1 = ${receivedFrom1}, spammer-2 = ${receivedFrom2}`), 2000);
+  let spammers = [
+    {
+      client: undefined,
+      receivedData: 0,
+      name: 'spammer-1',
+    },
+    {
+      client: undefined,
+      receivedData: 0,
+      name: 'spammer-2',
+    },
+  ];
 
-    const client1 = new net.Socket();
-    client1.connect(80, "spammer-1", () => console.log("Connected to spammer-1"));
-    client1.on('data', (data) => {
-      if (receivedFrom1 > 1000000 && !client2Started) {
-        client2Started = true;
-        const client2 = new net.Socket();
-        client2.connect(80, "spammer-2", () => console.log("Connected to spammer-2"));
-        client2.on('data', (data) => receivedFrom2 += data.length);
-        client2.on('close', () => {
-          console.log(`Connection with spammer-2 closed, received ${receivedFrom2} bytes`);
-        });
-      }
+  conn.on('data', onConnData);
+  conn.once('close', onConnClose);
+  conn.on('error', onConnError);
 
-      receivedFrom1 += data.length;
+  const interval = setInterval(() => {
+    console.log('---');
+    for (let spammer of spammers) {
+      console.log(`Received ${spammer.receivedData} from ${spammer.name} so far`);
+    }
+    console.log('---');
+  }, 2000);
+
+  function onConnData(d) {
+    console.log('Connection data from %s', remoteAddress);
+
+    let spammer = spammers.find(spammer => spammer.client === undefined);
+    if (spammer !== undefined) {
+      connectToSpammer(spammer);
+    }
+
+    conn.write(d);
+  }
+
+  function onConnClose() {
+    console.log('Connection with %s closed', remoteAddress);
+    clearInterval(interval);
+  }
+
+  function onConnError(err) {
+    console.log('Connection with %s error: %s', remoteAddress, err.message);
+  }
+
+  function connectToSpammer(spammer) {
+    const client = new net.Socket();
+    spammer.client = client;
+    client.connect(80, spammer.name, () => console.log("Connected to %s", spammer.name));
+    client.on('data', (data) => {
+      spammer.receivedData += data.length;
     });
-    client1.on('close', () => {
-      console.log(`Connection with spammer-1 closed, received ${receivedFrom1} bytes`);
+    client.on('close', () => {
+      console.log(`Connection with ${spammer.name} closed, received ${spammer.receivedData} bytes`);
     });
-
-    res.send("OK");
-  });
-
-app.listen(
-  PORT,
-  () => console.log(`Run 'curl localhost:${PORT}' to start suite`),
-);
+  }
+}
