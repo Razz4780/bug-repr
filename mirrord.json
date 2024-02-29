@@ -1,0 +1,11 @@
+{
+    "target": null,
+    "feature": {
+        "fs": "local",
+        "network": {
+            "outgoing": true,
+            "incoming": false,
+            "dns": true
+        }
+    }
+}
